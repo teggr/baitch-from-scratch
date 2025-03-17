@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<div th:fragment="chat-streams(chatStreams)">
+
+    <!--/*@thymesVar id="chatStream" type="List<cf.dev.recipes.ChatStream"*/-->
+    <th:block th:each="chatStream : ${chatStreams}">
+
+        <th:block th:if="${chatStream.profile.type.name == 'USER'}">
+
+            <div class="chat-message d-flex flex-row justify-content-start mb-4">
+
+                <img th:src="@{${chatStream.profile.image}}" alt="avatar 1" style="width: 45px; height: 100%; border-radius: 10px;">
+
+                <div>
+
+                    <th:block th:each="message : ${chatStream.messages}">
+
+                        <p class="small p-2 me-3 mb-1 text-white rounded-3 bg-primary" th:text="${message.content}"></p>
+
+                    </th:block>
+
+                </div>
+
+            </div>
+
+        </th:block>
+
+        <th:block th:if="${chatStream.profile.type.name == 'ASSISTANT'}">
+
+            <div class="chat-message d-flex flex-row justify-content-end mb-4 pt-1">
+
+                <div>
+
+                    <th:block th:each="message : ${chatStream.messages}">
+
+                        <th:block th:if="${message.type == 'text'}" >
+
+                            <p class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary" th:text="${message.content}"></p>
+
+                        </th:block>
+
+                        <th:block th:if="${message.type == 'suggestion'}" >
+
+                            <p class="small ms-3 mb-3 rounded-3 text-muted align-right">&#x2728; <span th:text="${message.content}"></span>  &#x2728;</p>
+
+                        </th:block>
+
+                        <th:block th:if="${message.type == 'cookingSession'}" >
+
+                            <p class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary">
+                                <span th:text="${'Total cooking time is '+ T(com.robintegg.demo.bfs.utils.DurationFormatter).formatDuration(message.content.totalTime) +' for ' + message.content.recipes.size + ' recipes.'}"></span>
+                            </p>
+
+                        </th:block>
+
+                        <th:block th:if="${message.type == 'reminder'}" >
+
+                            <p class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary">
+                                <a href="#">Add a reminder on <span th:text="${#temporals.format(message.content, 'dd/MMM/yyyy')}"></span></a>
+                            </p>
+
+                        </th:block>
+
+                        <th:block th:if="${message.type == 'recipes'}" >
+
+                            <th:block th:each="recipe, recipeStat : ${message.content}">
+
+                                <div class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary">
+
+                                    <p>
+                                        <strong><span th:text="${recipe.name}"/></strong> - <span th:text="${recipe.servings}"></span> servings in <span th:text="${T(com.robintegg.demo.bfs.utils.DurationFormatter).formatDuration(recipe.preparationTime)}"></span>
+
+                                      <a class="mb-3"
+                                         data-mdb-collapse-init
+                                         data-mdb-ripple-init
+                                         th:href="${'#recipe-details-' + recipeStat.index}"
+                                         role="button"
+                                         aria-expanded="false"
+                                         th:aria-controls="${'recipe-details-' + recipeStat.index}"
+                                      ><i class="fas fa-eye"></i></a>
+                                    </p>
+
+                                    <!-- Collapsed content -->
+                                    <div class="collapse" th:id="${'recipe-details-' + recipeStat.index}">
+                                        <p><em>Ingredients</em></p>
+                                        <ul>
+                                            <li th:each="ingredient : ${recipe.ingredients}" th:text="${ingredient}"/>
+                                        </ul>
+                                        <p><em>Steps</em></p>
+                                        <ol>
+                                            <li th:each="step : ${recipe.steps}" th:text="${step}" />
+                                        </ol>
+                                    </div>
+
+                                </div>
+
+                            </th:block>
+
+                        </th:block>
+
+                        <th:block th:if="${message.type == 'finalSteps'}" >
+
+                            <div class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary">
+                            <p>Final Steps</p>
+                            <ol>
+                                <li th:each="step : ${message.content}" th:text="${step}"></li>
+                            </ol>
+
+                            </div>
+
+                        </th:block>
+
+                        <th:block th:if="${message.type == 'overview'}" >
+
+                            <div class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary">
+                            <p>Your Batch Meal Plan</p>
+                            <ul>
+                                <li th:each="note : ${message.content}" th:text="${note}"></li>
+                            </ul>
+
+                            </div>
+
+                        </th:block>
+
+                        <th:block th:if="${message.type == 'shoppingList'}" >
+
+                            <div class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary">
+                                <h2>Shopping List</h2>
+
+                                <ul>
+                                    <li th:each="ingedient : ${message.content}">
+                                        <span th:text="${ingedient.name}"></span> <span th:text="${ingedient.quantity}"></span>
+                                    </li>
+                                </ul>
+
+                            </div>
+
+                        </th:block>
+
+                        <th:block th:if="${message.type == 'orderConfirmation'}" >
+
+                            <div class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary">
+                                <h2>Order is out for delivery!</h2>
+                                <p th:text="${message.content.confirmationMessage}"></p>
+                                <p th:text="${'Due on ' + #temporals.format(message.content.deliveryDate, 'dd/MMM/yyyy')}"></p>
+                                <p th:text="${'You will be charged £' + message.content.totalPrice}"></p>
+
+                            </div>
+
+                            <div class="small p-2 ms-3 mb-1 rounded-3 bg-body-tertiary">
+
+                                <p th:text="${message.content.summary}"></p>
+
+                            </div>
+
+                        </th:block>
+
+                    </th:block>
+
+                </div>
+
+                <img th:src="@{${chatStream.profile.image}}" alt="avatar 1" style="width: 45px; height: 100%; border-radius: 10px;" class="new-chat-stream">
+
+            </div>
+
+        </th:block>
+
+    </th:block>
+
+</div>
+
+</body>
+
+</html>

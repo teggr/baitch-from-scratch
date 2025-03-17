@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>B(ai)tch from Scratch</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <!-- Font Awesome -->
+    <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+            rel="stylesheet"
+    />
+    <!-- Google Fonts -->
+    <link
+            href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap"
+            rel="stylesheet"
+    />
+    <!-- MDB -->
+    <link
+            href="https://cdn.jsdelivr.net/npm/mdb-ui-kit@8.2.0/css/mdb.min.css"
+            rel="stylesheet"
+    />
+    <link
+            th:href="@{/css/styles.css}"
+            rel="stylesheet"
+    />
+</head>
+
+<body>
+
+<section>
+    <div class="container py-5">
+
+        <div class="row d-flex justify-content-center">
+            <div class="col-md-10 col-lg-8 col-xl-6">
+
+                <div class="card" id="chat2">
+                    <div class="card-header d-flex justify-content-between align-items-center p-3">
+                        <h5 class="mb-0">B(ai)tch from Scratch Meal Planner</h5>
+                        <form method="post" th:action="@{/reset}">
+                            <button type="submit" data-mdb-ripple-init class="btn btn-primary btn-sm" data-mdb-ripple-color="dark">Share <i class="fa-brands fa-instagram"></i></button>
+                        </form>
+                    </div>
+                    <div id="chat-messages" class="card-body" data-mdb-perfect-scrollbar-init style="position: relative; height: 400px; overflow-y: scroll;">
+
+                        <div th:replace="~{messages :: chat-streams(${chatStreams})}" ></div>
+
+                        <div id="next-message" class="d-flex flex-row">
+                            <div id="next-message-indicator" class="htmx-indicator spinner-border" role="status">
+                                <span class="visually-hidden">Thinking...</span>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="card-footer text-muted p-3">
+                        <form class="d-flex justify-content-start align-items-center"
+                                th:hx-post="@{/message}"
+                                hx-target="#next-message"
+                              hx-swap="beforebegin"
+                              hx-indicator="#next-message-indicator"
+                        >
+                            <img th:src="@{${userProfile.image}}"
+                                 alt="avatar 3" style="width: 40px; height: 100%;">
+                            <input type="text" class="form-control form-control-lg" id="message-text"
+                                   placeholder="Type message" name="message">
+                            <a class="ms-3 text-muted" href="#!"><i class="fas fa-paperclip"></i></a>
+                            <a class="ms-3 text-muted" href="#!"><i class="fas fa-smile"></i></a>
+                            <button type="submit" class="ms-3"><i class="fas fa-paper-plane"></i></button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</section>
+
+<!-- htmx -->
+<script type="text/javascript" th:src="@{/webjars/htmx.org/dist/htmx.min.js}"></script>
+<!-- MDB -->
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/mdb-ui-kit@8.2.0/js/mdb.umd.min.js"></script>
+
+<script>
+
+    function initializeCollapses() {
+        const collapseToggles = document.querySelectorAll('[data-mdb-collapse-init]');
+
+        collapseToggles.forEach(targetElement => {
+
+            if (targetElement && !targetElement.classList.contains('collapse-initialized')) {
+                new mdb.Collapse(targetElement).init();
+                targetElement.classList.add('collapse-initialized');
+            }
+        });
+
+    }
+
+    document.addEventListener('htmx:afterSettle', function(event) {
+        const elements = document.querySelectorAll('.new-chat-stream');
+        if(elements.length > 0) {
+            const lastElement = elements[elements.length - 1];
+            if (lastElement) {
+                lastElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+        const messageText = document.getElementById('message-text');
+        if(messageText) {
+            messageText.value = '';
+            messageText.focus();
+        }
+        initializeCollapses();
+    });
+</script>
+
+</body>
+
+</html>

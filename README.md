@@ -6,7 +6,6 @@ A Spring Boot AI demo for introducing concepts using Channel 4's Batch from Scra
 
 There are two services.
 
-
 ## batch-from-scratch-chat-bot
 
 This contains the main chat client and UI.
@@ -25,3 +24,6 @@ This is an online grocery store.
 
 Run `GroceryStoreApplication` on http://localhost:8081
 
+## Walk through
+
+Apply the `reset_project.patch` to reset the `BatchMealPlanning` component ready for adding all the component parts.

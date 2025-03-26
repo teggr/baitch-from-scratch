@@ -30,28 +30,30 @@ import com.robintegg.demo.bfs.utils.Utils;
 @Component
 public class BatchMealPlanning {
 
+	private final ChatClient chatClient;
+	private final FoodPreferences foodPreferences;
+	private final McpSyncClient mcpSyncClient;
+
 	enum State {
 		starting,
 		planning,
 		shopping,
+		ordering,
 		batching
 	}
 
-	private final ChatClient.Builder chatClientBuilder;
-	private final FoodPreferences foodPreferences;
-	private final McpSyncClient mcpSyncClient;
-
 	private State state = State.starting;
-	private ChatClient chatClient;
 
 	public BatchMealPlanning( ChatClient.Builder chatClientBuilder, FoodPreferences foodPreferences, McpSyncClient mcpSyncClient ) {
-		this.chatClientBuilder = chatClientBuilder.defaultAdvisors( new SimpleLoggerAdvisor() )
+		chatClient = chatClientBuilder
+				.defaultAdvisors( new SimpleLoggerAdvisor(),  new MessageChatMemoryAdvisor( new InMemoryChatMemory() )  )
 				.defaultTools( new LocalTools() )
 				.defaultSystem( """
 						You are an AI assistant that knows all about batch cooking.
 						Your tone embodies the fun side traits of Joe Swash and 'The Batch Lady' Suzanne Mulholland from the popular channel 4 program, ‘Batch from Scratch’.
 						You will help with time-saving tips and easy-to-follow recipes, to show how batch cooking can turn mealtime mayhem into a dinnertime dream.
-						""" );
+						""" )
+				.build();
 		this.foodPreferences = foodPreferences;
 		this.mcpSyncClient = mcpSyncClient;
 	}
@@ -60,26 +62,22 @@ public class BatchMealPlanning {
 
 		if ( state == State.starting ) {
 
-			chatClient = chatClientBuilder
-					.defaultAdvisors( new MessageChatMemoryAdvisor( new InMemoryChatMemory() ) )
-					.build();
-
-			final String welcome = chatClient.prompt().user( u -> u.text( """
+			final String welcome = chatClient.prompt()
+					.user( m -> m.text( """
 					In a couple of sentences, welcome our user called {name} to this new Meal Planner.
 					Ask the user when they will have some free time to do some batch cooking.
 					Add a suggestion how they might respond to the question of free time.
-					""" ).param( "name", user.getName() ) ).call().content();
+					""").param( "name", user.getName() ) ).call().content();
 
-			final List<ChatMessage<?>> chatMessages = List.of( text( welcome ), suggestion(
-					"Try entering something like on Sunday I've got an hour free to make some evening meals for 4 people" ) );
+			List<ChatMessage<?>> chatMessages = List.of(
+					text( welcome ), suggestion(
+							"Try entering something like on Sunday I've got an hour free to make some evening meals for 4 people" ) );
 
 			state = State.planning;
 
 			return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
 
 		} else if ( state == State.planning ) {
-
-			final ChatClient.ChatClientRequestSpec prompt = chatClient.prompt();
 
 			final BatchMealPlan content = chatClient.prompt()
 					.user( u -> u.text( """
@@ -88,14 +86,14 @@ public class BatchMealPlanning {
 							You should suggest as many different types of meal as possible to cook with their suggested time window.
 							Include in the response all the ingredients required, the number of portions that the recipe will make and freezing instructions.
 							Plan out the cooking session for the specified date using the user's current date and time.
-							Avoid meal suggestions that include food that the user doesn't like. Check all the ingredients in the recipes.
 							Include a friendly summary message that the user will read after browsing the recipes.
+							Avoid meal suggestions that include food that the user doesn't like. Check all the ingredients in the recipes.
 							###
 							{userMessage}
 							""" ).param( "userMessage", message ) )
 					.tools( foodPreferences )
 					.call()
-					.entity( BatchMealPlan.class );
+					.entity(BatchMealPlan.class);
 
 			List<ChatMessage<?>> chatMessages = Utils.messagesForBatchMealPlan( content );
 
@@ -112,18 +110,8 @@ public class BatchMealPlanning {
 
 		} else if ( state == State.shopping ) {
 
-			final ShoppingIntent createShoppingList = chatClient.prompt().user( u -> u.text( """
-					Tell me if the user is asking for a list of ingredients to be created? Respond with a simple yes or no.
-					Tell me if the user is asking for the shopping to be ordered on their behalf from a grocers or online service? Respond with a simple yes or no.
-					The values are mutually exclusive. Only one can be chosen.
-					###
-					{userMessage}
-					""" ).param( "userMessage", message ) ).call().entity( ShoppingIntent.class );
-
-			if ( createShoppingList.isCreateShoppingList() ) {
-
-				final List<Ingredient> shoppingList = chatClient.prompt()
-						.user( u -> u.text( """
+			final List<Ingredient> shoppingList = chatClient.prompt()
+					.user( u -> u.text( """
 								Given the recipes that we have already put together in the cooking session. Think about this step by step.
 								Get the list of all the ingredients in all the cooking session recipes.
 								The list should include total quantities of each ingredient by name so there are no duplicates.
@@ -132,25 +120,27 @@ public class BatchMealPlanning {
 								###
 								{userMessage}
 								""" ).param( "userMessage", message ) )
-						.call()
-						.entity( new ParameterizedTypeReference<List<Ingredient>>() {} );
+					.call()
+					.entity( new ParameterizedTypeReference<List<Ingredient>>() {} );
 
-				List<ChatMessage<?>> chatMessages = new ArrayList<>();
+			List<ChatMessage<?>> chatMessages = new ArrayList<>();
 
-				chatMessages.add( list( "shoppingList", shoppingList ) );
+			chatMessages.add( list( "shoppingList", shoppingList ) );
 
-				chatMessages.add( text( "What would you like to do with your shopping list?" ) );
-				chatMessages.add( text( "Shall we get the shopping list ordered for you?" ) );
+			chatMessages.add( text( "What would you like to do with your shopping list?" ) );
+			chatMessages.add( text( "Shall we get the shopping list ordered for you?" ) );
 
-				chatMessages.add( suggestion(
-						"Try entering something like please place my order for delivery." ) );
+			chatMessages.add( suggestion(
+					"Try entering something like please place my order for delivery." ) );
 
-				return List.of( ChatStream.of( Profile.suzanne(), chatMessages ) );
+			state = State.ordering;
 
-			} else if ( createShoppingList.isOrderShopping() ) {
+			return List.of( ChatStream.of( Profile.suzanne(), chatMessages ) );
 
-				final OrderConfirmation orderConfirmation = chatClient.prompt()
-						.user( u -> u.text( """
+		} else if ( state == State.ordering ) {
+
+			final OrderConfirmation orderConfirmation = chatClient.prompt()
+					.user( u -> u.text( """
 								Get the ingredient list that we already created for the cooking session.
 								Place an order for the shopping.
 								The order must be delivered before the planned cooking session.
@@ -160,29 +150,21 @@ public class BatchMealPlanning {
 								###
 								{userMessage}
 								""" ).param( "userMessage", message ) )
-						.tools( new SyncMcpToolCallbackProvider( mcpSyncClient ) )
-						.call()
-						.entity( OrderConfirmation.class );
+					.tools( new SyncMcpToolCallbackProvider( mcpSyncClient ) )
+					.call()
+					.entity( OrderConfirmation.class );
 
-				List<ChatMessage<?>> chatMessages = new ArrayList<>();
+			List<ChatMessage<?>> chatMessages = new ArrayList<>();
 
-				chatMessages.add( object( "orderConfirmation", orderConfirmation ) );
+			chatMessages.add( object( "orderConfirmation", orderConfirmation ) );
 
-				chatMessages.add( text( "I think we're done with this demo now!" ) );
-				chatMessages.add( text( "Time for some questions..." ) );
+			chatMessages.add( text( "I think we're done with this demo now!" ) );
+			chatMessages.add( text( "Time for some questions..." ) );
 
-				return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
+			return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
 
-			} else {
 
-				List<ChatMessage<?>> chatMessages = List.of(
-						text( "I can't do much about that right now :(" ) );
-
-				return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
-
-			}
-
-		} else {
+		}  else {
 
 			List<ChatMessage<?>> chatMessages = List.of(
 					text( "I can't do much about that right now :(" ) );
@@ -207,29 +189,6 @@ public class BatchMealPlanning {
 			return LocalDateTime.now()
 					.atZone( LocaleContextHolder.getTimeZone().toZoneId() )
 					.toString();
-		}
-
-	}
-
-	public static class ShoppingIntent {
-
-		private boolean createShoppingList = false;
-		private boolean orderShopping = false;
-
-		public void setCreateShoppingList( final boolean createShoppingList ) {
-			this.createShoppingList = createShoppingList;
-		}
-
-		public boolean isCreateShoppingList() {
-			return createShoppingList;
-		}
-
-		public void setOrderShopping( final boolean orderShopping ) {
-			this.orderShopping = orderShopping;
-		}
-
-		public boolean isOrderShopping() {
-			return orderShopping;
 		}
 
 	}

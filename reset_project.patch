@@ -6,8 +6,8 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
 diff --git a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanConfiguration.java b/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanConfiguration.java
---- a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanConfiguration.java	(revision a369ee0c5713121821fe896b1026657cca1216a0)
-+++ b/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanConfiguration.java	(date 1742316905945)
+--- a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanConfiguration.java	(revision bf4a706dbce948d44b4ac147915397b92ec6f276)
++++ b/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanConfiguration.java	(date 1742999439227)
 @@ -12,14 +12,14 @@
  @Configuration
  public class BatchMealPlanConfiguration {
@@ -38,27 +38,33 @@ Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
 <+>UTF-8
 ===================================================================
 diff --git a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanning.java b/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanning.java
---- a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanning.java	(revision a369ee0c5713121821fe896b1026657cca1216a0)
-+++ b/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanning.java	(date 1742317078021)
-@@ -37,41 +37,18 @@
- 		batching
- 	}
+--- a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanning.java	(revision bf4a706dbce948d44b4ac147915397b92ec6f276)
++++ b/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/BatchMealPlanning.java	(date 1742999599133)
+@@ -30,10 +30,6 @@
+ @Component
+ public class BatchMealPlanning {
  
--	private final ChatClient.Builder chatClientBuilder;
+-	private final ChatClient chatClient;
 -	private final FoodPreferences foodPreferences;
 -	private final McpSyncClient mcpSyncClient;
 -
+ 	enum State {
+ 		starting,
+ 		planning,
+@@ -44,34 +40,16 @@
+ 
  	private State state = State.starting;
--	private ChatClient chatClient;
  
 -	public BatchMealPlanning( ChatClient.Builder chatClientBuilder, FoodPreferences foodPreferences, McpSyncClient mcpSyncClient ) {
--		this.chatClientBuilder = chatClientBuilder.defaultAdvisors( new SimpleLoggerAdvisor() )
+-		chatClient = chatClientBuilder
+-				.defaultAdvisors( new SimpleLoggerAdvisor(),  new MessageChatMemoryAdvisor( new InMemoryChatMemory() )  )
 -				.defaultTools( new LocalTools() )
 -				.defaultSystem( """
 -						You are an AI assistant that knows all about batch cooking.
 -						Your tone embodies the fun side traits of Joe Swash and 'The Batch Lady' Suzanne Mulholland from the popular channel 4 program, ‘Batch from Scratch’.
 -						You will help with time-saving tips and easy-to-follow recipes, to show how batch cooking can turn mealtime mayhem into a dinnertime dream.
--						""" );
+-						""" )
+-				.build();
 -		this.foodPreferences = foodPreferences;
 -		this.mcpSyncClient = mcpSyncClient;
 +	public BatchMealPlanning() {
@@ -69,29 +75,24 @@ diff --git a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/Bat
  
  		if ( state == State.starting ) {
  
--			chatClient = chatClientBuilder
--					.defaultAdvisors( new MessageChatMemoryAdvisor( new InMemoryChatMemory() ) )
--					.build();
--
--			final String welcome = chatClient.prompt().user( u -> u.text( """
+-			final String welcome = chatClient.prompt()
+-					.user( m -> m.text( """
 -					In a couple of sentences, welcome our user called {name} to this new Meal Planner.
 -					Ask the user when they will have some free time to do some batch cooking.
 -					Add a suggestion how they might respond to the question of free time.
--					""" ).param( "name", user.getName() ) ).call().content();
+-					""").param( "name", user.getName() ) ).call().content();
 -
--			final List<ChatMessage<?>> chatMessages = List.of( text( welcome ), suggestion(
--					"Try entering something like on Sunday I've got an hour free to make some evening meals for 4 people" ) );
-+			List<ChatMessage<?>> chatMessages = List.of(
-+					text( "Sorry, I'm not in the right head space. This is awkward :(" ) );
+ 			List<ChatMessage<?>> chatMessages = List.of(
+-					text( welcome ), suggestion(
+-							"Try entering something like on Sunday I've got an hour free to make some evening meals for 4 people" ) );
++					text( "Erm, I'm not sure what to do :(" ) );
  
  			state = State.planning;
  
-@@ -79,113 +56,24 @@
+@@ -79,30 +57,8 @@
  
  		} else if ( state == State.planning ) {
  
--			final ChatClient.ChatClientRequestSpec prompt = chatClient.prompt();
--
 -			final BatchMealPlan content = chatClient.prompt()
 -					.user( u -> u.text( """
 -							Given the time constraints provided by the user.
@@ -99,14 +100,14 @@ diff --git a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/Bat
 -							You should suggest as many different types of meal as possible to cook with their suggested time window.
 -							Include in the response all the ingredients required, the number of portions that the recipe will make and freezing instructions.
 -							Plan out the cooking session for the specified date using the user's current date and time.
--							Avoid meal suggestions that include food that the user doesn't like. Check all the ingredients in the recipes.
 -							Include a friendly summary message that the user will read after browsing the recipes.
+-							Avoid meal suggestions that include food that the user doesn't like. Check all the ingredients in the recipes.
 -							###
 -							{userMessage}
 -							""" ).param( "userMessage", message ) )
 -					.tools( foodPreferences )
 -					.call()
--					.entity( BatchMealPlan.class );
+-					.entity(BatchMealPlan.class);
 -
 -			List<ChatMessage<?>> chatMessages = Utils.messagesForBatchMealPlan( content );
 -
@@ -117,27 +118,16 @@ diff --git a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/Bat
 -			chatMessages.add(
 -					suggestion( "Try entering something like please create me a shopping list." ) );
 +			List<ChatMessage<?>> chatMessages = List.of(
-+					text( "Eurgh. I'm not hungry. I don't want to think about food :(" ) );
++					text( "This is so awkward :(" ) );
  
  			state = State.shopping;
  
--			return List.of( ChatStream.of( Profile.suzanne(), chatMessages ) );
-+			return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
+@@ -110,28 +66,8 @@
  
  		} else if ( state == State.shopping ) {
  
--			final ShoppingIntent createShoppingList = chatClient.prompt().user( u -> u.text( """
--					Tell me if the user is asking for a list of ingredients to be created? Respond with a simple yes or no.
--					Tell me if the user is asking for the shopping to be ordered on their behalf from a grocers or online service? Respond with a simple yes or no.
--					The values are mutually exclusive. Only one can be chosen.
--					###
--					{userMessage}
--					""" ).param( "userMessage", message ) ).call().entity( ShoppingIntent.class );
--
--			if ( createShoppingList.isCreateShoppingList() ) {
--
--				final List<Ingredient> shoppingList = chatClient.prompt()
--						.user( u -> u.text( """
+-			final List<Ingredient> shoppingList = chatClient.prompt()
+-					.user( u -> u.text( """
 -								Given the recipes that we have already put together in the cooking session. Think about this step by step.
 -								Get the list of all the ingredients in all the cooking session recipes.
 -								The list should include total quantities of each ingredient by name so there are no duplicates.
@@ -146,25 +136,29 @@ diff --git a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/Bat
 -								###
 -								{userMessage}
 -								""" ).param( "userMessage", message ) )
--						.call()
--						.entity( new ParameterizedTypeReference<List<Ingredient>>() {} );
+-					.call()
+-					.entity( new ParameterizedTypeReference<List<Ingredient>>() {} );
 -
--				List<ChatMessage<?>> chatMessages = new ArrayList<>();
+-			List<ChatMessage<?>> chatMessages = new ArrayList<>();
 -
--				chatMessages.add( list( "shoppingList", shoppingList ) );
+-			chatMessages.add( list( "shoppingList", shoppingList ) );
 -
--				chatMessages.add( text( "What would you like to do with your shopping list?" ) );
--				chatMessages.add( text( "Shall we get the shopping list ordered for you?" ) );
+-			chatMessages.add( text( "What would you like to do with your shopping list?" ) );
+-			chatMessages.add( text( "Shall we get the shopping list ordered for you?" ) );
 -
--				chatMessages.add( suggestion(
--						"Try entering something like please place my order for delivery." ) );
--
--				return List.of( ChatStream.of( Profile.suzanne(), chatMessages ) );
--
--			} else if ( createShoppingList.isOrderShopping() ) {
--
--				final OrderConfirmation orderConfirmation = chatClient.prompt()
--						.user( u -> u.text( """
+-			chatMessages.add( suggestion(
+-					"Try entering something like please place my order for delivery." ) );
++			List<ChatMessage<?>> chatMessages = List.of(
++					text( "Please stop pestering me :(" ) );
+ 
+ 			state = State.ordering;
+ 
+@@ -139,27 +75,8 @@
+ 
+ 		} else if ( state == State.ordering ) {
+ 
+-			final OrderConfirmation orderConfirmation = chatClient.prompt()
+-					.user( u -> u.text( """
 -								Get the ingredient list that we already created for the cooking session.
 -								Place an order for the shopping.
 -								The order must be delivered before the planned cooking session.
@@ -174,40 +168,22 @@ diff --git a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/Bat
 -								###
 -								{userMessage}
 -								""" ).param( "userMessage", message ) )
--						.tools( new SyncMcpToolCallbackProvider( mcpSyncClient ) )
--						.call()
--						.entity( OrderConfirmation.class );
+-					.tools( new SyncMcpToolCallbackProvider( mcpSyncClient ) )
+-					.call()
+-					.entity( OrderConfirmation.class );
 -
--				List<ChatMessage<?>> chatMessages = new ArrayList<>();
+-			List<ChatMessage<?>> chatMessages = new ArrayList<>();
 -
--				chatMessages.add( object( "orderConfirmation", orderConfirmation ) );
+-			chatMessages.add( object( "orderConfirmation", orderConfirmation ) );
 -
--				chatMessages.add( text( "I think we're done with this demo now!" ) );
--				chatMessages.add( text( "Time for some questions..." ) );
--
--				return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
--
--			} else {
--
--				List<ChatMessage<?>> chatMessages = List.of(
--						text( "I can't do much about that right now :(" ) );
+-			chatMessages.add( text( "I think we're done with this demo now!" ) );
+-			chatMessages.add( text( "Time for some questions..." ) );
 +			List<ChatMessage<?>> chatMessages = List.of(
-+					text( "Shopping is soo boring :(" ) );
- 
--				return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
-+			return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
- 
--			}
--
- 		} else {
- 
- 			List<ChatMessage<?>> chatMessages = List.of(
--					text( "I can't do much about that right now :(" ) );
-+					text( "Wibble wobble. I don't know what to do :(" ) );
++					text( "Sorry, I've been no help. Try again using the share button :)" ) );
  
  			return List.of( ChatStream.of( Profile.joe(), chatMessages ) );
  
-@@ -199,39 +87,4 @@
+@@ -181,16 +98,4 @@
  
  	}
  
@@ -219,29 +195,6 @@ diff --git a/batch-from-scratch-chatbot/src/main/java/com/robintegg/demo/bfs/Bat
 -			return LocalDateTime.now()
 -					.atZone( LocaleContextHolder.getTimeZone().toZoneId() )
 -					.toString();
--		}
--
--	}
--
--	public static class ShoppingIntent {
--
--		private boolean createShoppingList = false;
--		private boolean orderShopping = false;
--
--		public void setCreateShoppingList( final boolean createShoppingList ) {
--			this.createShoppingList = createShoppingList;
--		}
--
--		public boolean isCreateShoppingList() {
--			return createShoppingList;
--		}
--
--		public void setOrderShopping( final boolean orderShopping ) {
--			this.orderShopping = orderShopping;
--		}
--
--		public boolean isOrderShopping() {
--			return orderShopping;
 -		}
 -
 -	}
